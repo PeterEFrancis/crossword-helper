@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en" class="h-100">
+  <head>
+    <title>Crossword Helper</title>
+    <!-- <link rel="icon" type="image/png" href="/static/logo.png"> -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="keywords" content="">
+
+    <!-- Bootstrap -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- JQuery -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+
+    <style>
+      canvas {
+        border: 1px solid black;
+        width: 100%;
+      }
+    </style>
+
+  </head>
+
+  <body class="d-flex flex-column h-100">
+
+    <div class="container-fluid">
+      <div class="row my-5">
+        <div class="col-md-6 text-center">
+          <canvas id="canvas" width="1000" height="1000">
+            Browser doesn't support canvas element.
+          </canvas>
+        </div>
+        <div class="col-md-3">
+          <h4>Down</h4>
+          <ol id="down"></ol>
+        </div>
+        <div class="col-md-3">
+          <h4>Across</h4>
+          <ol id="across"></ol>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-12">
+        </div>
+      </div>
+    </div>
+  </body>
+
+  <script>
+
+    const BLACK = 1;
+    const WHITE = 0;
+
+    var N = 10;
+    var LW = 2;
+    var selected_square_id = null;
+    var grid = get_blank_array(N ** 2);
+    var dir = 1;
+
+
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+
+
+
+    function get_square_id() {
+      let rect = canvas.getBoundingClientRect();
+      let user_x = (event.clientX - rect.left) * (canvas.width / canvas.clientWidth);
+      let user_y = (event.clientY - rect.top) * (canvas.height / canvas.clientHeight);
+      let row = Math.floor(user_y / (canvas.width / N));
+      let col = Math.floor(user_x / (canvas.width / N));
+      return row * N + col;
+    }
+
+
+    canvas.addEventListener('click', function(e) {
+      new_selected_square_id = get_square_id(e);
+
+      if (grid[new_selected_square_id] == BLACK) {
+        selected_square_id = -1;
+      }
+      if (new_selected_square_id == selected_square_id) {
+        dir = 1 + N - dir;
+      }
+
+      selected_square_id = new_selected_square_id;
+      update();
+    });
+
+
+
+    canvas.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      toggle_black(get_square_id(e));
+      update();
+      return false;
+    }, false);
+
+
+    window.addEventListener('keydown', function(e) {
+      if (e.keyCode >= 65 && e.keyCode <= 90 && grid[selected_square_id] != BLACK) {
+        grid[selected_square_id] = e.key;
+        move(dir);
+      } else if (e.key == 'Backspace' && grid[selected_square_id] != BLACK) {
+        grid[selected_square_id] = WHITE;
+        move(-dir);
+      } else if (e.key == 'ArrowLeft') {
+        move(-1)
+      } else if (e.key == 'ArrowRight' || e.key == ' ') {
+        move(1)
+      } else if (e.key == 'ArrowUp') {
+        move(-N);
+      } else if (e.key == 'ArrowDown') {
+        move(N);
+      }
+      update();
+    });
+
+
+    function move(dr) {
+      selected_square_id = (selected_square_id + dr) % (N ** 2);
+    }
+
+
+    function get_word(pos, dr) {
+      let word = [];
+      while (true) {
+        word.push(grid[pos]);
+        pos += dr;
+        if (
+          pos > N ** 2 ||
+          grid[pos] == BLACK ||
+          (dr == 1 && pos % N == 0) ||
+          (dr == N && Math.floor(pos / N) == N)
+        ) {
+          break;
+        }
+
+      }
+
+      return word.join("").replaceAll("0", " ");
+    }
+
+
+
+    function update() {
+      if (selected_square_id >= N ** 2) {
+        selected_square_id = -1;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // draw grid
+      ctx.fillStyle = "black";
+      for (let i = 0; i <= N + 1; i++) {
+        ctx.fillRect(0 - LW / 2, i * (canvas.height / N) - LW / 2, canvas.width, LW);
+        ctx.fillRect(i * (canvas.width / N) - (LW / 2), 0, LW, canvas.width);
+      }
+
+      // numbers
+      let nums = get_numbers();
+
+
+      // get Down and Across
+      let down = [];
+      let across = [];
+      for (let i = 0; i < N ** 2; i++) {
+        let r = Math.floor(i / N);
+        let c = i % N;
+        if (nums[i] > 0) {
+          if (r == 0 || grid[N * (r - 1) + c] == BLACK) {
+            let word = get_word(i, N);
+            if (word.length > 1) {
+              down[nums[i]] = word;
+            }
+          }
+          if (c == 0 || grid[N * r + c - 1] == BLACK) {
+            let word = get_word(i, 1);
+            if (word.length > 1) {
+              across[nums[i]] = word;
+            }
+          }
+        }
+      }
+
+      document.getElementById('down').innerHTML = "";
+      document.getElementById('across').innerHTML = "";
+      for (let i in down) {
+        document.getElementById('down').innerHTML += "<li value='" + i + "'>" + down[i].toUpperCase() + "</li>"
+      }
+      for (let i in across) {
+        document.getElementById('across').innerHTML += "<li value='" + i + "'>" + across[i].toUpperCase() + "</li>"
+      }
+
+
+
+      // draw contents
+      for (let i = 0; i < N ** 2; i++) {
+        let r = Math.floor(i / N);
+        let c = i % N;
+
+        let x = c * canvas.width / N;
+        let y = r * canvas.width / N;
+
+
+        if (nums[i] != 0) {
+          let font_size = canvas.height / (4 * N);
+          ctx.textAlign = "left";
+          ctx.textBaseline = "alphabetic";
+          ctx.fillStyle = "black";
+          ctx.font = font_size + "px Arial";
+          ctx.fillText(nums[i], x + font_size / 6, y + font_size);
+        }
+
+        if (selected_square_id == i) {
+          ctx.fillStyle = "rgb(0, 0, 255, 0.2)";
+          ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
+        }
+
+        if (grid[i] == BLACK) {
+          ctx.fillStyle = "black";
+          ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
+
+        } else if (grid[i] != WHITE) {
+          let font_size = (2 / 3) * canvas.height / N;
+          ctx.fillStyle = "black";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.font = font_size + "px Arial";
+          ctx.fillText(grid[i].toUpperCase(), x + canvas.width / (2 * N), y + canvas.width / (1.75 * N));
+        }
+
+      }
+
+    }
+
+
+
+
+
+
+    function get_blank_array(n) {
+      let ret = [];
+      for (let i = 0; i < n; i++) {
+        ret.push(0);
+      }
+      return ret;
+    }
+
+
+    function toggle_black(sid) {
+      if (grid[sid] == BLACK || grid[sid] == WHITE) {
+        grid[sid] = WHITE + BLACK - grid[sid];
+        grid[N ** 2 - sid - 1] = grid[sid];
+      }
+    }
+
+
+    function get_numbers() {
+      let ret = get_blank_array(N ** 2);
+      let count = 1;
+      for (let i = 0; i < N ** 2; i++) {
+        if (grid[i] != BLACK) {
+          if (grid[i - N] == BLACK || grid[i - 1] == BLACK || i < N || (i % N) == 0) {
+            ret[i] = count;
+            count++;
+          }
+        }
+      }
+      return ret;
+    }
+
+
+    window.onbeforeunload = function () {
+        return "Do you really want to close?";
+    };
+
+  </script>
+</html>
+
+
+
+
+
+
