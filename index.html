@@ -28,23 +28,52 @@
   <body class="d-flex flex-column h-100">
 
     <div class="container-fluid">
+      <div clsas="row">
+        <div class="my-3 col-md-12 text-center">
+          <h1>Crossword Helper</h1>
+        </div>
+      </div>
       <div class="row my-5">
-        <div class="col-md-6 text-center">
+        <div class="col-md-6">
+          <div class="row">
+            
+            <div class="col-sm-3">
+              <button type="button" class="btn btn-outline-secondary" onclick="download_image()" style="width: 100%">
+                Download
+              </button>
+            </div>
+            <div class="col-sm-4">
+              <button type="button" class="btn btn-outline-secondary" onclick="toggle_letters()" style="width: 100%">
+                Toggle Letters
+              </button>
+            </div>
+            <div class="col-sm-5">     
+              <div class="input-group mb-3" style="width: 100%;">
+                <input id="N" type="number" step="1" min="2" value="10" class="form-control" placeholder="size">
+                <button class="btn btn-danger" onclick="new_grid()">Reset</button>
+              </div>
+            </div>
+          </div>
           <canvas id="canvas" width="1000" height="1000">
             Browser doesn't support canvas element.
           </canvas>
+          
+
+          <h3 class="pt-5" >
+            Suggestions&nbsp;&nbsp;
+            <div class="form-switch" style="display: inline-block;">
+              <input class="form-check-input" type="checkbox" oninput="toggle_suggestions(this.checked)">
+            </div>
+          </h3>
+          <p id="suggestions" style="column-count: 5; font-family: monospace;"></p>
         </div>
         <div class="col-md-3">
           <h4>Down</h4>
-          <ol id="down"></ol>
+          <p id="down" style="font-family: monospace;"></p>
         </div>
         <div class="col-md-3">
           <h4>Across</h4>
-          <ol id="across"></ol>
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-md-12">
+          <p id="across" style="font-family: monospace;"></p>
         </div>
       </div>
     </div>
@@ -57,15 +86,45 @@
 
     var N = 10;
     var LW = 2;
-    var selected_square_id = null;
+    var selected_square_id = -1;
     var grid = get_blank_array(N ** 2);
     var dir = 1;
 
+    var show_letters = true;
+
+    var show_suggestions = false;
+
+    var dictionary = [];
+    $.get("https://raw.githubusercontent.com/PeterEFrancis/crossword-helper/main/scrabble.txt", function(txt) {
+      var dict_words = txt.split("\n");
+      for (var i = 0; i < dict_words.length; i++ ) {
+        dictionary.push(dict_words[i].trim());
+      }
+    });
+
+
+    function toggle_suggestions(bool) {
+      show_suggestions = bool;
+      update();
+    }
+
+
+
+
+    function new_grid() {
+      N = Number(document.getElementById('N').value);
+      grid = get_blank_array(N ** 2);
+      selected_square_id = -1;
+      update();
+    }
 
     var canvas = document.getElementById('canvas');
     var ctx = canvas.getContext('2d');
 
-
+    function toggle_letters() {
+      show_letters = !show_letters;
+      update();
+    }
 
     function get_square_id() {
       let rect = canvas.getBoundingClientRect();
@@ -93,12 +152,12 @@
 
 
 
-    canvas.addEventListener('contextmenu', function(e) {
-      e.preventDefault();
-      toggle_black(get_square_id(e));
-      update();
-      return false;
-    }, false);
+    // canvas.addEventListener('contextmenu', function(e) {
+    //   e.preventDefault();
+    //   toggle_black(get_square_id(e));
+    //   update();
+    //   return false;
+    // }, false);
 
 
     window.addEventListener('keydown', function(e) {
@@ -116,6 +175,8 @@
         move(-N);
       } else if (e.key == 'ArrowDown') {
         move(N);
+      } else if (e.key == '/') {
+        toggle_black(selected_square_id);
       }
       update();
     });
@@ -126,28 +187,48 @@
     }
 
 
-    function get_word(pos, dr) {
-      let word = [];
+    function get_word_locs(pos, dr) {
+      let ret = [];
+
+      
+
+      for (let i = 0; i < N; i++) {
+        let x = pos % N;
+        let y = Math.floor(pos / N);
+
+        if ((dr == 1 && x == 0) || (dr == N && y == 0)) {
+          break;
+        }
+        if (grid[pos - dr] == BLACK) {
+          break;
+        }
+        pos -= dr;
+      }
+
       while (true) {
-        word.push(grid[pos]);
+        ret.push(pos);
         pos += dr;
         if (
-          pos > N ** 2 ||
+          pos >= N ** 2 ||
           grid[pos] == BLACK ||
           (dr == 1 && pos % N == 0) ||
           (dr == N && Math.floor(pos / N) == N)
         ) {
           break;
         }
-
       }
+      return ret;
+    }
 
-      return word.join("").replaceAll("0", " ");
+
+    function get_word(pos, dr) {
+      return get_word_locs(pos, dr).map(x => grid[x]).join("").replaceAll("0", "-");
     }
 
 
 
     function update() {
+
       if (selected_square_id >= N ** 2) {
         selected_square_id = -1;
       }
@@ -190,12 +271,33 @@
       document.getElementById('down').innerHTML = "";
       document.getElementById('across').innerHTML = "";
       for (let i in down) {
-        document.getElementById('down').innerHTML += "<li value='" + i + "'>" + down[i].toUpperCase() + "</li>"
+        document.getElementById('down').innerHTML += i + ". " + down[i].toUpperCase() + "<br>"
       }
       for (let i in across) {
-        document.getElementById('across').innerHTML += "<li value='" + i + "'>" + across[i].toUpperCase() + "</li>"
+        document.getElementById('across').innerHTML += i + ". " + across[i].toUpperCase() + "<br>"
       }
 
+      let curr;
+      if (selected_square_id > -1 && grid[selected_square_id] != BLACK) {
+        curr = get_word_locs(selected_square_id, dir);
+      } 
+
+      if (curr && show_suggestions) {
+        let word = "^" + curr.map(x => grid[x]).join("").replaceAll("0", ".") + "$";
+
+        let regex = new RegExp(word);
+
+        let words = [];
+        for (let word of dictionary) {
+          if (regex.test(word)) {
+            words.push(word);
+          }
+        }
+
+        document.getElementById('suggestions').innerHTML = words.join("<br>");
+      } else {
+        document.getElementById('suggestions').innerHTML = "";
+      }
 
 
       // draw contents
@@ -216,22 +318,30 @@
           ctx.fillText(nums[i], x + font_size / 6, y + font_size);
         }
 
-        if (selected_square_id == i) {
-          ctx.fillStyle = "rgb(0, 0, 255, 0.2)";
-          ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
-        }
-
         if (grid[i] == BLACK) {
           ctx.fillStyle = "black";
           ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
 
-        } else if (grid[i] != WHITE) {
+        } else if (grid[i] != WHITE && show_letters) {
           let font_size = (2 / 3) * canvas.height / N;
           ctx.fillStyle = "black";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.font = font_size + "px Arial";
           ctx.fillText(grid[i].toUpperCase(), x + canvas.width / (2 * N), y + canvas.width / (1.75 * N));
+        }
+
+        if (curr && curr.includes(i)) {
+          ctx.fillStyle = "rgb(0, 0, 255, 0.2)";
+          ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
+        }
+
+        if (selected_square_id == i) {
+          ctx.lineWidth = "4";
+          ctx.strokeStyle = "rgb(0, 0, 255)";
+          ctx.beginPath();
+          ctx.rect(x, y, canvas.width / N, canvas.height / N);
+          ctx.stroke();
         }
 
       }
@@ -265,7 +375,12 @@
       let count = 1;
       for (let i = 0; i < N ** 2; i++) {
         if (grid[i] != BLACK) {
-          if (grid[i - N] == BLACK || grid[i - 1] == BLACK || i < N || (i % N) == 0) {
+          if (
+            ((grid[i - N] == BLACK || i < N) && (i < N**2 - N && grid[i + N] != BLACK)) || 
+            (grid[i - N] == BLACK && (Math.floor(i / N) < N - 2)) ||
+            ((grid[i - 1] == BLACK || (i % N) == 0) && (i % N < N - 1 && grid[i + 1] != BLACK)) ||
+            (grid[i - 1] == BLACK && (i % N < N - 2))
+          ) {
             ret[i] = count;
             count++;
           }
@@ -275,9 +390,28 @@
     }
 
 
+    function download_image() {
+      selected_square_id = -1;
+      update();
+      let link = document.createElement('a');
+      link.download = 'CW-puzzle.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+    
+
+
+
+
+
+
     window.onbeforeunload = function () {
         return "Do you really want to close?";
     };
+
+
+
+
 
   </script>
 </html>

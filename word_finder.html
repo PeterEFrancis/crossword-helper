@@ -41,7 +41,7 @@
   <script>
 
     var dictionary = [];
-    $.get("https://raw.githubusercontent.com/PeterEFrancis/canvas-games/master/games/boggle/scrabble.txt", function(txt) {
+    $.get("https://raw.githubusercontent.com/PeterEFrancis/crossword-helper/main/scrabble.txt", function(txt) {
       var dict_words = txt.split("\n");
       for (var i = 0; i < dict_words.length; i++ ) {
         dictionary.push(dict_words[i].trim());
@@ -51,7 +51,6 @@
 
     function update(str) {
       let regex = new RegExp(str);
-      console.log(regex);
 
       let words = [];
       for (let word of dictionary) {
