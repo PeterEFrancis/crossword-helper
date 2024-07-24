@@ -58,36 +58,61 @@
             Browser doesn't support canvas element.
           </canvas>
           
+          <div class="row">
+            <div class="col-sm-6">
+              <h4>Down</h4>
+              <p id="down" style="font-family: monospace;"></p>
+            </div>
+            <div class="col-sm-6">
+              <h4>Across</h4>
+              <p id="across" style="font-family: monospace;"></p>
+            </div>
+          </div>
+        </div>
 
-          <h3 class="pt-5" >
-            Suggestions&nbsp;&nbsp;
+        <div class="col-md-6">
+          <strong>Possible Letters: </strong><span id="poss"></span>
+          <h3 class="pt-2">
+            Word Suggestions&nbsp;&nbsp;
             <div class="form-switch" style="display: inline-block;">
               <input class="form-check-input" type="checkbox" oninput="toggle_suggestions(this.checked)">
             </div>
           </h3>
           <p id="suggestions" style="column-count: 5; font-family: monospace;"></p>
         </div>
-        <div class="col-md-3">
-          <h4>Down</h4>
-          <p id="down" style="font-family: monospace;"></p>
-        </div>
-        <div class="col-md-3">
-          <h4>Across</h4>
-          <p id="across" style="font-family: monospace;"></p>
-        </div>
+        
       </div>
     </div>
   </body>
 
   <script>
 
+
+
     const BLACK = 1;
     const WHITE = 0;
 
-    var N = 10;
+
+    var grid, N;
+
+    
+    let pre_N = localStorage.getItem("N");
+    if (pre_N) {
+      N = Number(pre_N);
+    } else {
+      N = 15;
+    }
+    document.getElementById("N").value = N;
+    let pre_grid = localStorage.getItem("grid");
+    if (pre_grid) {
+      grid = JSON.parse(pre_grid);
+    } else {
+      grid = get_blank_array(N ** 2);
+    }
+  
+
     var LW = 2;
     var selected_square_id = -1;
-    var grid = get_blank_array(N ** 2);
     var dir = 1;
 
     var show_letters = true;
@@ -102,12 +127,20 @@
       }
     });
 
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+
+
+
+    update();
+
+
+
 
     function toggle_suggestions(bool) {
       show_suggestions = bool;
       update();
     }
-
 
 
 
@@ -118,8 +151,9 @@
       update();
     }
 
-    var canvas = document.getElementById('canvas');
-    var ctx = canvas.getContext('2d');
+
+
+
 
     function toggle_letters() {
       show_letters = !show_letters;
@@ -161,7 +195,7 @@
 
 
     window.addEventListener('keydown', function(e) {
-      if (e.keyCode >= 65 && e.keyCode <= 90 && grid[selected_square_id] != BLACK) {
+      if (!(event.metaKey || event.ctrlKey) && (e.keyCode >= 65 && e.keyCode <= 90 && grid[selected_square_id] != BLACK)) {
         grid[selected_square_id] = e.key;
         move(dir);
       } else if (e.key == 'Backspace' && grid[selected_square_id] != BLACK) {
@@ -226,8 +260,44 @@
     }
 
 
+    function get_possible_letters(pos) {
+      let horiz_locs = get_word_locs(pos, 1);
+      let horiz_pos = horiz_locs.indexOf(pos);
+      let horiz_word = get_word(pos, 1);
+      let horiz_matches = get_matches("^" + horiz_word.replaceAll('-', '.') + "$");
+      let horiz_letters = horiz_matches.map(x => x[horiz_pos]);
+
+      let vert_locs = get_word_locs(pos, N);
+      let vert_pos = vert_locs.indexOf(pos);
+      let vert_word = get_word(pos, N);
+      let vert_matches = get_matches("^" + vert_word.replaceAll('-', '.') + "$");
+      let vert_letters = vert_matches.map(x => x[vert_pos]);
+
+      return Array.from(new Set(horiz_letters).intersection(new Set(vert_letters))).sort().join(", ").toUpperCase();
+
+
+
+
+    }
+
+
+    function get_matches(regstr) {
+      let regex = new RegExp(regstr);
+
+      let words = [];
+      for (let word of dictionary) {
+        if (regex.test(word)) {
+          words.push(word);
+        }
+      }
+      return words;
+    }
+
 
     function update() {
+
+      localStorage.setItem("N", N);
+      localStorage.setItem("grid", JSON.stringify(grid));
 
       if (selected_square_id >= N ** 2) {
         selected_square_id = -1;
@@ -285,18 +355,19 @@
       if (curr && show_suggestions) {
         let word = "^" + curr.map(x => grid[x]).join("").replaceAll("0", ".") + "$";
 
-        let regex = new RegExp(word);
-
-        let words = [];
-        for (let word of dictionary) {
-          if (regex.test(word)) {
-            words.push(word);
-          }
-        }
+        let words = get_matches(word);
 
         document.getElementById('suggestions').innerHTML = words.join("<br>");
+
       } else {
         document.getElementById('suggestions').innerHTML = "";
+      }
+
+      if (selected_square_id > -1) {
+        document.getElementById('poss').innerHTML = get_possible_letters(selected_square_id);
+      } else {
+        document.getElementById('poss').innerHTML = "";
+
       }
 
 
@@ -344,6 +415,14 @@
           ctx.stroke();
         }
 
+        if (selected_square_id == N**2  - 1 - i) {
+          ctx.lineWidth = "4";
+          ctx.strokeStyle = "rgb(0, 255, 0)";
+          ctx.beginPath();
+          ctx.rect(x, y, canvas.width / N, canvas.height / N);
+          ctx.stroke();
+        }
+
       }
 
     }
@@ -363,7 +442,7 @@
 
 
     function toggle_black(sid) {
-      if (grid[sid] == BLACK || grid[sid] == WHITE) {
+      if ((grid[sid] == BLACK || grid[sid] == WHITE) && (grid[N ** 2 - sid - 1] == BLACK || grid[N ** 2 - sid - 1] == WHITE)) {
         grid[sid] = WHITE + BLACK - grid[sid];
         grid[N ** 2 - sid - 1] = grid[sid];
       }
@@ -375,12 +454,12 @@
       let count = 1;
       for (let i = 0; i < N ** 2; i++) {
         if (grid[i] != BLACK) {
+          let xl = get_word(i, 1).length;
+          let yl = get_word(i, N).length;
           if (
-            ((grid[i - N] == BLACK || i < N) && (i < N**2 - N && grid[i + N] != BLACK)) || 
-            (grid[i - N] == BLACK && (Math.floor(i / N) < N - 2)) ||
-            ((grid[i - 1] == BLACK || (i % N) == 0) && (i % N < N - 1 && grid[i + 1] != BLACK)) ||
-            (grid[i - 1] == BLACK && (i % N < N - 2))
-          ) {
+            ((grid[i - 1] == BLACK || i % N == 0) && xl > 1) ||
+            ((grid[i - N] == BLACK || Math.floor(i / N) == 0) && yl > 1)
+          ){
             ret[i] = count;
             count++;
           }
@@ -405,9 +484,9 @@
 
 
 
-    window.onbeforeunload = function () {
-        return "Do you really want to close?";
-    };
+    // window.onbeforeunload = function () {
+    //     return "Do you really want to close?";
+    // };
 
 
 
