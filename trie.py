@@ -3,8 +3,10 @@ class Trie:
         self.n = n  # name
         self.c = {}  # children
         self.l = False  # is leaf
+        self.length = 0
 
     def push(self, string):
+        self.length += 1
         n = string[0]
         if n not in self.c:
             self.c[n] = Trie(n)
