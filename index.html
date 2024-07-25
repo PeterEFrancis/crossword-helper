@@ -34,10 +34,10 @@
         </div>
       </div>
       <div class="row my-5">
-        <div class="col-md-6">
+        <div class="col-md-7">
           <div class="row">
             
-            <div class="col-sm-3">
+            <div class="col-sm-4">
               <button type="button" class="btn btn-outline-secondary" onclick="download_image()" style="width: 100%">
                 Download
               </button>
@@ -47,7 +47,7 @@
                 Toggle Letters
               </button>
             </div>
-            <div class="col-sm-5">     
+            <div class="col-sm-4">     
               <div class="input-group mb-3" style="width: 100%;">
                 <input id="N" type="number" step="1" min="2" value="10" class="form-control" placeholder="size">
                 <button class="btn btn-danger" onclick="new_grid()">Reset</button>
@@ -70,7 +70,7 @@
           </div>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-5">
           <strong>Possible Letters: </strong><span id="poss"></span>
           <h3 class="pt-2">
             Word Suggestions&nbsp;&nbsp;
@@ -182,6 +182,7 @@
 
       selected_square_id = new_selected_square_id;
       update();
+      e.preventDefault();
     });
 
 
@@ -209,7 +210,7 @@
         move(-N);
       } else if (e.key == 'ArrowDown') {
         move(N);
-      } else if (e.key == '/') {
+      } else if (e.key == '.') {
         toggle_black(selected_square_id);
       }
       update();
@@ -381,11 +382,11 @@
 
 
         if (nums[i] != 0) {
-          let font_size = canvas.height / (4 * N);
+          let font_size = canvas.height / (3.5 * N);
           ctx.textAlign = "left";
           ctx.textBaseline = "alphabetic";
           ctx.fillStyle = "black";
-          ctx.font = font_size + "px Arial";
+          ctx.font = font_size + "px Verdana";
           ctx.fillText(nums[i], x + font_size / 6, y + font_size);
         }
 
@@ -394,16 +395,16 @@
           ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
 
         } else if (grid[i] != WHITE && show_letters) {
-          let font_size = (2 / 3) * canvas.height / N;
+          let font_size = (0.5) * canvas.height / N;
           ctx.fillStyle = "black";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.font = font_size + "px Arial";
-          ctx.fillText(grid[i].toUpperCase(), x + canvas.width / (2 * N), y + canvas.width / (1.75 * N));
+          ctx.font = font_size + "px Verdana";
+          ctx.fillText(grid[i].toUpperCase(), x + canvas.width / (2 * N), y + canvas.width / (1.65 * N));
         }
 
         if (curr && curr.includes(i)) {
-          ctx.fillStyle = "rgb(0, 0, 255, 0.2)";
+          ctx.fillStyle = "rgb(0, 0, 255, 0.1)";
           ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
         }
 
@@ -421,6 +422,12 @@
           ctx.beginPath();
           ctx.rect(x, y, canvas.width / N, canvas.height / N);
           ctx.stroke();
+        }
+
+        // errors
+        if (grid[i] != BLACK && (get_word(i, 1).length < 3 || get_word(i, N).length < 3)) {
+          ctx.fillStyle = "rgb(255, 0, 0, 0.5)";
+          ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
         }
 
       }
