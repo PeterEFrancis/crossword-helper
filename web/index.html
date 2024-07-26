@@ -16,6 +16,8 @@
     <!-- JQuery -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
 
+    <script src="xw.js"></script>
+
     <style>
       canvas {
         border: 1px solid black;
@@ -33,27 +35,34 @@
           <h1>Crossword Helper</h1>
         </div>
       </div>
+      <div class="row mt-5">
+        <div class="col-sm-3">     
+          <div class="input-group mb-3" style="width: 100%;">
+            <input id="N" type="number" step="1" min="2" value="10" class="form-control" placeholder="size">
+            <button class="btn btn-danger" onclick="new_grid()">Reset</button>
+          </div>
+        </div>
+        <div class="col-sm-3">
+          <button type="button" class="btn btn-outline-secondary" onclick="download_image()" style="width: 100%">
+            Download
+          </button>
+        </div>
+        <div class="col-sm-3">
+          <button type="button" class="btn btn-outline-secondary" onclick="toggle_letters()" style="width: 100%">
+            Toggle Fill
+          </button>
+        </div>
+        <div class="col-sm-3">
+          <div class="input-group mb-3" style="width: 100%;">
+            <input id="k" type="number" step="1" min="2" value="2" class="form-control" placeholder="size">
+            <button class="btn btn-warning" onclick="handle_filler()">Find Fill</button>
+          </div>
+        </div>
+        
+      </div>
       <div class="row my-5">
         <div class="col-md-6">
-          <div class="row">
-            
-            <div class="col-sm-4">
-              <button type="button" class="btn btn-outline-secondary" onclick="download_image()" style="width: 100%">
-                Download
-              </button>
-            </div>
-            <div class="col-sm-4">
-              <button type="button" class="btn btn-outline-secondary" onclick="toggle_letters()" style="width: 100%">
-                Toggle Letters
-              </button>
-            </div>
-            <div class="col-sm-4">     
-              <div class="input-group mb-3" style="width: 100%;">
-                <input id="N" type="number" step="1" min="2" value="10" class="form-control" placeholder="size">
-                <button class="btn btn-danger" onclick="new_grid()">Reset</button>
-              </div>
-            </div>
-          </div>
+          
           <canvas id="canvas" width="1000" height="1000">
             Browser doesn't support canvas element.
           </canvas>
@@ -89,30 +98,21 @@
   </body>
 
   <script>
-
-
-
-    const BLACK = 1;
-    const WHITE = 0;
-
-
-    var grid, N;
-
     
-    let pre_N = localStorage.getItem("N");
-    if (pre_N) {
-      N = Number(pre_N);
+    let N;
+    let pre_grid = localStorage.getItem("grid");
+    if (pre_grid) {
+      pre_grid = JSON.parse(pre_grid);
+      N = pre_grid.length ** (1/2);
     } else {
+      pre_grid = get_blank_array(15 ** 2);
       N = 15;
     }
     document.getElementById("N").value = N;
-    let pre_grid = localStorage.getItem("grid");
-    if (pre_grid) {
-      grid = JSON.parse(pre_grid);
-    } else {
-      grid = get_blank_array(N ** 2);
-    }
-  
+
+
+    var xw = new XW(pre_grid, true);
+
 
     var LW = 2;
     var selected_square_id = -1;
@@ -123,21 +123,16 @@
 
     var show_suggestions = false;
 
-    var dictionary = [];
-    $.get("https://raw.githubusercontent.com/PeterEFrancis/crossword-helper/main/word-lists/broda.txt", function(txt) {
-      var dict_words = txt.split("\n");
-      for (var i = 0; i < dict_words.length; i++ ) {
-        dictionary.push(dict_words[i].trim());
-      }
-    });
 
     var canvas = document.getElementById('canvas');
     var ctx = canvas.getContext('2d');
 
 
 
-    update();
-
+    window.addEventListener("load", function (e) {
+      update();
+    });
+    
 
 
 
@@ -146,18 +141,12 @@
       update();
     }
 
-
-
     function new_grid() {
-      N = Number(document.getElementById('N').value);
-      grid = get_blank_array(N ** 2);
+      let N = Number(document.getElementById('N').value);
+      xw = new XW(get_blank_array(N ** 2));
       selected_square_id = -1;
       update();
     }
-
-
-
-
 
     function toggle_letters() {
       show_letters = !show_letters;
@@ -174,7 +163,6 @@
     }
 
 
-
     document.addEventListener('click', function(e) {
       if (e.srcElement == canvas) {
         typing = true;
@@ -186,37 +174,25 @@
       update();
     });
 
-
-
     function click_canvas(e) {
       new_selected_square_id = get_square_id(e);
 
-      if (grid[new_selected_square_id] == BLACK) {
+      if (xw.grid[new_selected_square_id] == BLACK) {
         selected_square_id = -1;
       }
       if (new_selected_square_id == selected_square_id) {
-        dir = 1 + N - dir;
+        dir = 1 + xw.N - dir;
       }
       selected_square_id = new_selected_square_id;
     }
 
-
-
-    // canvas.addEventListener('contextmenu', function(e) {
-    //   e.preventDefault();
-    //   toggle_black(get_square_id(e));
-    //   update();
-    //   return false;
-    // }, false);
-
-
     window.addEventListener('keydown', function(e) {
       if (typing) {
-        if (!(event.metaKey || event.ctrlKey) && (e.keyCode >= 65 && e.keyCode <= 90 && grid[selected_square_id] != BLACK)) {
-          grid[selected_square_id] = e.key;
+        if (!(event.metaKey || event.ctrlKey) && (e.keyCode >= 65 && e.keyCode <= 90 && xw.grid[selected_square_id] != BLACK)) {
+          xw.grid[selected_square_id] = e.key;
           move(dir);
-        } else if (e.key == 'Backspace' && grid[selected_square_id] != BLACK) {
-          grid[selected_square_id] = WHITE;
+        } else if (e.key == 'Backspace' && xw.grid[selected_square_id] != BLACK) {
+          xw.grid[selected_square_id] = WHITE;
           move(-dir);
         } else if (e.key == 'ArrowLeft') {
           move(-1)
@@ -230,99 +206,40 @@
           toggle_black(selected_square_id);
         }
         update();
+        e.preventDefault();
       }
     });
 
 
     function move(dr) {
-      selected_square_id = (selected_square_id + dr) % (N ** 2);
+      selected_square_id = (selected_square_id + dr) % (xw.N ** 2);
     }
 
-
-    function get_word_locs(pos, dr) {
-      let ret = [];
-
-      
-
-      for (let i = 0; i < N; i++) {
-        let x = pos % N;
-        let y = Math.floor(pos / N);
-
-        if ((dr == 1 && x == 0) || (dr == N && y == 0)) {
-          break;
-        }
-        if (grid[pos - dr] == BLACK) {
-          break;
-        }
-        pos -= dr;
-      }
-
-      while (true) {
-        ret.push(pos);
-        pos += dr;
-        if (
-          pos >= N ** 2 ||
-          grid[pos] == BLACK ||
-          (dr == 1 && pos % N == 0) ||
-          (dr == N && Math.floor(pos / N) == N)
-        ) {
-          break;
-        }
-      }
-      return ret;
-    }
-
-
-    function get_word(pos, dr) {
-      return get_word_locs(pos, dr).map(x => grid[x]).join("").replaceAll("0", "-");
-    }
 
 
     function get_possible_letters(pos) {
-      let horiz_locs = get_word_locs(pos, 1);
+      let horiz_locs = xw.get_word_locs(pos, 1);
       let horiz_pos = horiz_locs.indexOf(pos);
-      let horiz_word = get_word(pos, 1);
-      let horiz_matches = get_matches("^" + horiz_word.replaceAll('-', '.') + "$");
+      let horiz_word = xw.get_word(pos, 1);
+      let horiz_matches = get_matches(horiz_word);
       let horiz_letters = horiz_matches.map(x => x[horiz_pos]);
 
-      let vert_locs = get_word_locs(pos, N);
+      let vert_locs = xw.get_word_locs(pos, N);
       let vert_pos = vert_locs.indexOf(pos);
-      let vert_word = get_word(pos, N);
-      let vert_matches = get_matches("^" + vert_word.replaceAll('-', '.') + "$");
+      let vert_word = xw.get_word(pos, xw.N);
+      let vert_matches = get_matches(vert_word);
       let vert_letters = vert_matches.map(x => x[vert_pos]);
 
       return Array.from(new Set(horiz_letters).intersection(new Set(vert_letters))).sort().join(", ").toUpperCase();
-
     }
 
-
-
-
-    function get_matches(regstr_lst) {
-      let words = [];
-      for (let word of dictionary) {
-        let flag = false;
-        for (let regstr of regstr_lst) {
-          let regex = new RegExp(regstr);
-          if (!regex.test(word)) {
-            flag = true;
-            break;
-          }
-        }
-        if (!flag) {
-          words.push(word);
-        }
-      }
-      return words;
-    }
 
 
     function update() {
 
-      localStorage.setItem("N", N);
-      localStorage.setItem("grid", JSON.stringify(grid));
+      localStorage.setItem("grid", JSON.stringify(xw.grid));
 
-      if (selected_square_id >= N ** 2) {
+      if (selected_square_id >= xw.N ** 2) {
         selected_square_id = -1;
       }
 
@@ -330,30 +247,30 @@
 
       // draw grid
       ctx.fillStyle = "black";
-      for (let i = 0; i <= N + 1; i++) {
-        ctx.fillRect(0 - LW / 2, i * (canvas.height / N) - LW / 2, canvas.width, LW);
-        ctx.fillRect(i * (canvas.width / N) - (LW / 2), 0, LW, canvas.width);
+      for (let i = 0; i <= xw.N + 1; i++) {
+        ctx.fillRect(0 - LW / 2, i * (canvas.height / xw.N) - LW / 2, canvas.width, LW);
+        ctx.fillRect(i * (canvas.width / xw.N) - (LW / 2), 0, LW, canvas.width);
       }
 
       // numbers
-      let nums = get_numbers();
+      let nums = xw.get_numbers();
 
 
       // get Down and Across
       let down = [];
       let across = [];
-      for (let i = 0; i < N ** 2; i++) {
-        let r = Math.floor(i / N);
-        let c = i % N;
+      for (let i = 0; i < xw.N ** 2; i++) {
+        let r = Math.floor(i / xw.N);
+        let c = i % xw.N;
         if (nums[i] > 0) {
-          if (r == 0 || grid[N * (r - 1) + c] == BLACK) {
-            let word = get_word(i, N);
+          if (r == 0 || xw.grid[N * (r - 1) + c] == BLACK) {
+            let word = xw.get_word(i, xw.N);
             if (word.length > 1) {
               down[nums[i]] = word;
             }
           }
-          if (c == 0 || grid[N * r + c - 1] == BLACK) {
-            let word = get_word(i, 1);
+          if (c == 0 || xw.grid[N * r + c - 1] == BLACK) {
+            let word = xw.get_word(i, 1);
             if (word.length > 1) {
               across[nums[i]] = word;
             }
@@ -371,16 +288,16 @@
       }
 
       let curr;
-      if (selected_square_id > -1 && grid[selected_square_id] != BLACK) {
-        curr = get_word_locs(selected_square_id, dir);
+      if (selected_square_id > -1 && xw.grid[selected_square_id] != BLACK) {
+        curr = xw.get_word_locs(selected_square_id, dir);
       } 
 
       if (curr && show_suggestions) {
-        let word = "^" + curr.map(x => grid[x]).join("").replaceAll("0", ".") + "$";
+        let word = "^" + curr.map(x => xw.grid[x]).join("").replaceAll("0", ".") + "$";
 
         // let filter = "^" + document.getElementById('filter').value + "$";
 
-        let words = get_matches([word]);
+        let words = get_matches(word);
 
         document.getElementById('suggestions').innerHTML = words.join("<br>");
 
@@ -397,16 +314,16 @@
 
 
       // draw contents
-      for (let i = 0; i < N ** 2; i++) {
-        let r = Math.floor(i / N);
-        let c = i % N;
+      for (let i = 0; i < xw.N ** 2; i++) {
+        let r = Math.floor(i / xw.N);
+        let c = i % xw.N;
 
-        let x = c * canvas.width / N;
-        let y = r * canvas.width / N;
+        let x = c * canvas.width / xw.N;
+        let y = r * canvas.width / xw.N;
 
 
         if (nums[i] != 0) {
-          let font_size = canvas.height / (3.5 * N);
+          let font_size = canvas.height / (3.5 * xw.N);
           ctx.textAlign = "left";
           ctx.textBaseline = "alphabetic";
           ctx.fillStyle = "black";
@@ -414,105 +331,69 @@
           ctx.fillText(nums[i], x + font_size / 6, y + font_size);
         }
 
-        if (grid[i] == BLACK) {
+        if (xw.grid[i] == BLACK) {
           ctx.fillStyle = "black";
-          ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
+          ctx.fillRect(x, y, canvas.width / xw.N, canvas.height / xw.N);
 
-        } else if (grid[i] != WHITE && show_letters) {
-          let font_size = (0.5) * canvas.height / N;
+        } else if (xw.grid[i] != WHITE && show_letters) {
+          let font_size = (0.5) * canvas.height / xw.N;
           ctx.fillStyle = "black";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.font = font_size + "px Verdana";
-          ctx.fillText(grid[i].toUpperCase(), x + canvas.width / (2 * N), y + canvas.width / (1.65 * N));
+          ctx.fillText(xw.grid[i].toUpperCase(), x + canvas.width / (2 * xw.N), y + canvas.width / (1.65 * xw.N));
         }
 
         if (curr && curr.includes(i)) {
           ctx.fillStyle = "rgb(0, 0, 255, 0.1)";
-          ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
+          ctx.fillRect(x, y, canvas.width / xw.N, canvas.height / xw.N);
         }
 
         if (selected_square_id == i) {
           ctx.lineWidth = "4";
           ctx.strokeStyle = "rgb(0, 0, 255)";
           ctx.beginPath();
-          ctx.rect(x, y, canvas.width / N, canvas.height / N);
+          ctx.rect(x, y, canvas.width / xw.N, canvas.height / xw.N);
           ctx.stroke();
         }
 
-        if (selected_square_id == N**2  - 1 - i) {
+        if (selected_square_id == xw.N**2  - 1 - i) {
           ctx.lineWidth = "4";
           ctx.strokeStyle = "rgb(0, 255, 0)";
           ctx.beginPath();
-          ctx.rect(x, y, canvas.width / N, canvas.height / N);
+          ctx.rect(x, y, canvas.width / xw.N, canvas.height / xw.N);
           ctx.stroke();
         }
 
         // errors
-        if (grid[i] != BLACK && (get_word(i, 1).length < 3 || get_word(i, N).length < 3)) {
+        if (xw.grid[i] != BLACK && (xw.get_word(i, 1).length < 3 || xw.get_word(i, xw.N).length < 3)) {
           ctx.fillStyle = "rgb(255, 0, 0, 0.5)";
-          ctx.fillRect(x, y, canvas.width / N, canvas.height / N);
+          ctx.fillRect(x, y, canvas.width / xw.N, canvas.height / xw.N);
         }
 
       }
 
-    }
-
-
-
-
-
-
-    function get_blank_array(n) {
-      let ret = [];
-      for (let i = 0; i < n; i++) {
-        ret.push(0);
-      }
-      return ret;
     }
 
 
     function toggle_black(sid) {
-      if ((grid[sid] == BLACK || grid[sid] == WHITE) && (grid[N ** 2 - sid - 1] == BLACK || grid[N ** 2 - sid - 1] == WHITE)) {
-        grid[sid] = WHITE + BLACK - grid[sid];
-        grid[N ** 2 - sid - 1] = grid[sid];
+      if ((xw.grid[sid] == BLACK || xw.grid[sid] == WHITE) && (xw.grid[xw.N ** 2 - sid - 1] == BLACK || xw.grid[xw.N ** 2 - sid - 1] == WHITE)) {
+        xw.grid[sid] = WHITE + BLACK - xw.grid[sid];
+        xw.grid[N ** 2 - sid - 1] = xw.grid[sid];
       }
     }
 
 
-    function get_numbers() {
-      let ret = get_blank_array(N ** 2);
-      let count = 1;
-      for (let i = 0; i < N ** 2; i++) {
-        if (grid[i] != BLACK) {
-          let xl = get_word(i, 1).length;
-          let yl = get_word(i, N).length;
-          if (
-            ((grid[i - 1] == BLACK || i % N == 0) && xl > 1) ||
-            ((grid[i - N] == BLACK || Math.floor(i / N) == 0) && yl > 1)
-          ){
-            ret[i] = count;
-            count++;
-          }
-        }
-      }
-      return ret;
-    }
-
-
+  
     function download_image() {
       selected_square_id = -1;
       update();
       let link = document.createElement('a');
-      link.download = 'CW-puzzle.png';
+      link.download = 'xw-puzzle.png';
       link.href = canvas.toDataURL();
       link.click();
     }
     
-
-
-
-
 
 
     // window.onbeforeunload = function () {
@@ -521,6 +402,17 @@
 
 
 
+    function handle_filler() {
+      let k = Number(document.getElementById('k').value);
+      let fill = xw.get_possible_fills(k);
+      if (fill) {
+        xw.grid = fill.grid;
+      } else {
+        alert('no possible fill');
+      }
+      
+      update();
+    }
 
 
   </script>
